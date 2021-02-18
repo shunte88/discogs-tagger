@@ -563,7 +563,7 @@ class TaggerUtils(object):
             '%album%': self.album.title,
             '%catno%': ', '.join(self.album.catnumbers),
             '%country%': self.album.country,
-            '%countryiso%': self.album.countryiso,
+            '%isocountry%': self.album.countryiso,
             "%year%": self.album.year,
             '%artist%': self.album.disc(discno).track(trackno).artist,
             '%totaldiscs%': self.album.disctotal,
@@ -596,8 +596,8 @@ class TaggerUtils(object):
             "%ALBARTIST%": self.album.artist,
             "%YEAR%": self.album.year,
             "%CATNO%": self.album.catnumbers[0],
-            '%COUNTRY%': self.album.countryiso,
-            '%COUNTRYISO%': self.album.countryiso,
+            '%COUNTRY%': self.album.country,
+            '%ISOCOUNTRY%': self.album.countryiso,
             "%GENRE%": self.album.genre,
             "%STYLE%": self.album.style,
             "%ARTIST%": self.album.disc(discno).track(trackno).artist,
@@ -740,8 +740,9 @@ class TaggerUtils(object):
             filetype = ""
             self.album.copy_files = []
 
+            logger.debug(f"flagged mult-disc: {self.album.has_multi_disc}")
             if self.album.has_multi_disc or self._audio_files_in_subdirs(dir_list) is True:
-                logger.debug("is multi disc album, looping discs")
+                logger.debug(">>> is multi disc album, looping discs")
 
                 logger.debug("dir_list: %s" % dir_list)
                 dirno = 0
@@ -789,13 +790,16 @@ class TaggerUtils(object):
                 target_list = [os.path.join(disc_source_dir, x) for x in disc_list
                                  if x.lower().endswith(TaggerUtils.FILE_TYPE)]
 
+                # bug here for multi-disc
+                # targetlist holds all tracks combined across discs, but disc.tracks has the per disc count
+                # displays the mismatrch and proceeds to throw a  list index out of bounds
                 if not len(target_list) == len(disc.tracks):
-                    logger.debug("target_list: %s" % target_list)
-                    logger.error("not matching number of files....")
+                    logger.debug(f"target_list: {target_list}")
+                    logger.error(f"not matching number of files... want {len(target_list)} have {len(disc.tracks)}")
                     # we should throw an error in here
 
                 for position, filename in enumerate(target_list):
-                    logger.debug("track position: %d" % position)
+                    logger.debug(f"track position: {position}")
 
                     track = disc.tracks[position]
 

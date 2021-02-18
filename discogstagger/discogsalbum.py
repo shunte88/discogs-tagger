@@ -304,6 +304,7 @@ class DiscogsAlbum(object):
             iso = 'EU'
         else:
             _temp = pycountry.countries.search_fuzzy(country)[0]
+            print(f"{country} {_temp}")
             if _temp:
                 with ignored(KeyError, IndexError): #, ObjectError):
                     iso = _temp.alpha_2
@@ -327,14 +328,18 @@ class DiscogsAlbum(object):
         album.year = self.year
         album.format = self.release.data["formats"][0]["name"]
         album.format_description = self.format_description
+
+        # test combo style and genre ?
         album.genres = self.release.data["genres"]
         album.media = self.media
-
 
         try:
             album.styles = self.release.data["styles"]
         except KeyError:
             album.styles = [""]
+
+        logger.debug(f"genre ...: {album.genres}")
+        logger.debug(f"style ...: {album.styles}")
 
         if "country" in self.release.data:
             album.country = self.release.data["country"]
@@ -450,6 +455,7 @@ class DiscogsAlbum(object):
         """ Obtain the number of discs for the given release. """
 
         discno = 0
+        anglodiscno = ""
 
         # allows tagging of digital releases.
         # sample format <format name="File" qty="2" text="320 kbps">
@@ -461,7 +467,10 @@ class DiscogsAlbum(object):
                 if format['name'] in ['CD', 'CDr', 'Vinyl', 'LP']:
                     discno += int(format['qty'])
 
-        logger.info("determined %d no of discs total" % discno)
+        if discno>1:
+            anglodiscno = "s"
+
+        logger.info(f"determined {discno} disc{anglodiscno} total")
         return discno
 
     @property
@@ -1173,7 +1182,7 @@ class DiscogsSearch(DiscogsConnector):
             if difference.total_seconds() > tolerance:
                 tolerance = tolerance + difference.total_seconds()
 
-        logger.info('tracklength tolerance before averaging out by the number of tracks:  {}'.format(tolerance))
+        logger.info(f'tracklength tolerance before averaging out by the number of tracks:  {tolerance}')
         tolerance = tolerance / tracktotal
         logging.debug('tracklength tolerance for release (change if there are any matching issues):  {}'.format(tolerance))
         logger.info('tracklength tolerance for release (change if there are any matching issues):  {}'.format(tolerance))

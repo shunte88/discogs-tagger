@@ -79,13 +79,15 @@ def getSourceDirs():
     if options.recursive:
         logger.debug("determine sourcedirs")
         source_dirs = file_utils.walk_dir_tree(options.sourcedir, id_file)
+        if 0==len(source_dirs):
+            source_dirs = file_utils.walk_dir_base_tree(options.sourcedir)
     elif options.searchDiscogs:
         logger.debug("looking for audio files")
         source_dirs = file_utils.get_audio_dirs(options.sourcedir)
     else:
-        logger.debug("using sourcedir: %s" % options.sourcedir)
+        logger.debug(f"using sourcedir: {options.sourcedir}")
         source_dirs = [options.sourcedir]
-    logger.info('Found {} audio source directories to process'.format(len(source_dirs)))
+    logger.info(f'Found {len(source_dirs)} audio source directories to process')
     return source_dirs
 
 
@@ -111,7 +113,7 @@ def processSourceDirs(source_dirs, tagger_config):
             done_file_path = os.path.join(source_dir, done_file)
 
             if os.path.exists(done_file_path) and not options.forceUpdate:
-                logger.warn('Do not read {}, because {} exists and forceUpdate is false'.format(source_dir, done_file))
+                logger.warn(f'Do not read {source_dir}, because {done_file} exists and forceUpdate is false')
                 continue
 
             # reread config to make sure, that the album specific options are reset for each
@@ -184,7 +186,7 @@ def processSourceDirs(source_dirs, tagger_config):
             try:
                 taggerUtils._get_target_list()
             except TaggerError as te:
-                msg = "Error during Tagging ({0}), {1}: {2}".format(releaseid, source_dir, te)
+                msg = f"Error during Tagging ({releaseid}), {source_dir}: {te}"
                 logger.error(msg)
                 discs_with_errors.append(msg)
                 continue
@@ -247,7 +249,7 @@ def processSourceDirs(source_dirs, tagger_config):
     logger.info("releases touched: %s" % len(source_dirs))
 
     if discs_with_errors:
-        logger.error("The following discs could not get converted.")
+        logger.error("The following discs could not be converted.")
         for msg in discs_with_errors:
             logger.error(msg)
 

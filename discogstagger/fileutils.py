@@ -37,10 +37,19 @@ class FileUtils(object):
 
     def walk_dir_tree(self, start_dir, id_file):
         source_dirs = []
-        for root, dirs, files in os.walk(start_dir):
+        for root, _, files in os.walk(start_dir):
             if id_file in files:
-                logger.debug("found %s in %s" % (id_file, root))
+                logger.debug(f"found {id_file} in {root}")
                 source_dirs.append(root)
+
+        return source_dirs
+
+    def walk_dir_base_tree(self, start_dir):
+        source_dirs = []
+        for root, dirs, _ in os.walk(start_dir):
+            for dir in dirs:
+                logger.debug(f"found {dir} in {root}")
+                source_dirs.append(os.path.join(root, dir))
 
         return source_dirs
 
