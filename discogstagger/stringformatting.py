@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-import re, os
+import re
+import os
+
 
 class StringFormatting(object):
     """ The goal here is to have one formatting string that can cope with any
@@ -137,7 +139,7 @@ class StringFormatting(object):
             elif re.search(r'\(', c) and lastchar != '\\':
                 command += c
             elif re.search(r'\)', c) and lastchar != '\\':
-                hierarchy = hierarchy -1
+                hierarchy = hierarchy - 1
                 command += c
                 if hierarchy == 0:
                     result = self.execute(command)
@@ -159,12 +161,12 @@ class StringFormatting(object):
         """
         output = ''
 
-#TODO:  regex to capture empty & unquoted parameters
+# TODO:  regex to capture empty & unquoted parameters
 
         functNameMatch = re.findall(r'(\$[a-z0-9_]+)\(', string)
         for match in functNameMatch:
             if match not in self.functions:
-                 return 'unknown command'
+                return 'unknown command'
         string = re.sub(r'\$', 'self.', string)
         result = eval(string)
 
@@ -215,24 +217,30 @@ class StringFormatting(object):
         failMessage = 'Fail'
 
         """Test 1: directly calling function"""
-        result = self.num(8,4)
+        result = self.num(8, 4)
         test = '0008'
-        output = 'Output should read: "{}": {}'.format(test, failMessage if result != test else passMessage)
+        output = 'Output should read: "{}": {}'.format(
+            test, failMessage if result != test else passMessage)
         print(output)
 
         """Test 2: track from a single artist album"""
         result = stringFormatting.parseString(track['formatted_string'], track)
-        output = 'Output should read "{}": {}'.format(track['test'], failMessage if result != track['test'] else passMessage)
+        output = 'Output should read "{}": {}'.format(
+            track['test'], failMessage if result != track['test'] else passMessage)
         print(output)
 
         """Test 3: track from a various artist album"""
-        result = stringFormatting.parseString(various['formatted_string'], various)
-        output = 'Output should read "{}": {}'.format(various['test'], failMessage if result != various['test'] else passMessage)
+        result = stringFormatting.parseString(
+            various['formatted_string'], various)
+        output = 'Output should read "{}": {}'.format(
+            various['test'], failMessage if result != various['test'] else passMessage)
         print(output)
 
         """Test 4: track from a multidisc album"""
-        result = stringFormatting.parseString(multidisctrack['formatted_string'], multidisctrack)
-        output = 'Output should read "{}": {}'.format(multidisctrack['test'], failMessage if result != multidisctrack['test'] else passMessage)
+        result = stringFormatting.parseString(
+            multidisctrack['formatted_string'], multidisctrack)
+        output = 'Output should read "{}": {}'.format(
+            multidisctrack['test'], failMessage if result != multidisctrack['test'] else passMessage)
         print(output)
 
 # stringFormatting = StringFormatting()

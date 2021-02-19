@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
-# from urllib import FancyURLopener
+
+from ext.mediafile import MediaFile
+from discogstagger.stringformatting import StringFormatting
+from discogstagger.album import Album, Disc, Track
+from discogstagger.discogsalbum import DiscogsAlbum
+from mako.lookup import TemplateLookup
+from mako.template import Template
+from unicodedata import normalize
 import errno
 import os
 import re
@@ -14,16 +21,6 @@ from datetime import datetime, timedelta
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
-from unicodedata import normalize
-
-from mako.template import Template
-from mako.lookup import TemplateLookup
-
-from discogstagger.discogsalbum import DiscogsAlbum
-from discogstagger.album import Album, Disc, Track
-from discogstagger.stringformatting import StringFormatting
-
-from ext.mediafile import MediaFile
 
 logger = logging
 
@@ -36,14 +33,17 @@ logger = logging
 #         FancyURLopener.__init__(self)
 #
 
+
 class TaggerError(Exception):
     """ A central exception for all errors happening during the tagging
     """
+
     def __init__(self, value):
         self.value = value
 
     def __str__(self):
         return repr(self.value)
+
 
 class TagHandler(object):
     """ Uses the album (taggerutils) and tags all given files using the given
@@ -92,12 +92,13 @@ class TagHandler(object):
         self.album.codec = metadata.type
 
         # set album metadata
-        metadata.album = self.album.title
-        metadata.composer = self.album.artist
+        metadata.album = self.album.title  # add formatting methods
+        if "various" not in self.album.artist.lower():
+            metadata.composer = self.album.artist
 
         # use list of albumartists
         if 'Various' in self.album.artists and self.album.is_compilation == True:
-            metadata.albumartist = [ self.variousartists ]
+            metadata.albumartist = [self.variousartists]
         else:
             metadata.albumartist = self.album.artists
 
@@ -111,6 +112,7 @@ class TagHandler(object):
 
         metadata.year = self.album.year
         metadata.country = self.album.country
+        metadata.countryiso = self.album.countryiso
 
         metadata.catalognum = self.album.catnumbers[0]
 
@@ -118,10 +120,10 @@ class TagHandler(object):
         metadata.groupings = self.album.styles
 
         # use genres to allow multiple genres in muliple fields
-        metadata.genres = self.album.genres
+        metadata.genres = self.album.genres + self.album.styles
 
-        # this assumes, that there is a metadata-tag with the id_tag_name in the
-        # metadata object
+        # this assumes, that there is a metadata-tag with the
+        # id_tag_name in the metadata object
         setattr(metadata, self.config.id_tag_name, self.album.id)
         metadata.discogs_release_url = self.album.url
 
@@ -142,7 +144,7 @@ class TagHandler(object):
         logger.debug("tags: %s" % tags)
         for name in tags:
             value = self.config.get("tags", name)
-            if not value == None:
+            if value is not None:
                 setattr(metadata, name, value)
 
         # set track metadata
@@ -159,11 +161,12 @@ class TagHandler(object):
 
         metadata.tracktotal = len(self.album.disc(track.discnumber).tracks)
 
-        if not keepTags is None:
+        if keepTags is not None:
             for name in keepTags:
                 setattr(metadata, name, keepTags[name])
 
         metadata.save()
+
 
 class FileHandler(object):
     """ this class contains all file handling tasks for the tagger,
@@ -173,7 +176,6 @@ class FileHandler(object):
         FileHandling and Tagging, which is not as nice for testing and
         for future extensability.
     """
-
 
     def __init__(self, album, tagger_config):
         self.config = tagger_config
@@ -185,15 +187,17 @@ class FileHandler(object):
     def mkdir_p(self, path):
         try:
             os.makedirs(path)
-        except OSError as exc: # Python >2.5
+        except OSError as exc:  # Python >2.5
             if exc.errno == errno.EEXIST and os.path.isdir(path):
                 pass
-            else: raise
+            else:
+                raise
 
     def create_done_file(self):
         # could be, that the directory does not exist anymore ;-)
         if os.path.exists(self.album.sourcedir):
-            done_file = os.path.join(self.album.sourcedir, self.config.get("details", "done_file"))
+            done_file = os.path.join(
+                self.album.sourcedir, self.config.get("details", "done_file"))
             open(done_file, "w")
 
     def create_album_dir(self):
@@ -209,16 +213,21 @@ class FileHandler(object):
         logger.debug("album targetdir: %s" % self.album.target_dir)
 
         for disc in self.album.discs:
-            logger.debug("disc.sourcedir: %s" % disc.sourcedir)
-            logger.debug("disc.target_dir: %s" % disc.target_dir)
+            try:
 
-            if disc.sourcedir != None:
-                source_folder = os.path.join(self.album.sourcedir, disc.sourcedir)
-            else:
+                logger.debug("disc.target_dir: %s" % disc.target_dir)
+                if hasattr(disc, 'sourcedir') and disc.sourcedir is not None:
+                    logger.debug("disc.sourcedir: %s" % disc.sourcedir)
+                    source_folder = os.path.join(
+                        self.album.sourcedir, disc.sourcedir)
+                else:
+                    source_folder = self.album.sourcedir
+            except Exception as e:
                 source_folder = self.album.sourcedir
 
-            if disc.target_dir != None:
-                target_folder = os.path.join(self.album.target_dir, disc.target_dir)
+            if disc.target_dir is not None:
+                target_folder = os.path.join(
+                    self.album.target_dir, disc.target_dir)
             else:
                 target_folder = self.album.target_dir
 
@@ -241,10 +250,11 @@ class FileHandler(object):
                     if not os.path.exists(source_file):
                         logger.error("Source does not exists")
                         # throw error
-                    logger.debug("copying files (%s/%s)", source_folder, track.orig_file)
+                    logger.debug("copying files (%s/%s)",
+                                 source_folder, track.orig_file)
 
                     shutil.copyfile(os.path.join(source_folder, track.orig_file),
-                        os.path.join(target_folder, track.new_file))
+                                    os.path.join(target_folder, track.new_file))
 
     def remove_source_dir(self):
         """
@@ -262,7 +272,8 @@ class FileHandler(object):
 
     def copy_other_files(self):
         # copy "other files" on request
-        copy_other_files = self.config.getboolean("details", "copy_other_files")
+        copy_other_files = self.config.getboolean(
+            "details", "copy_other_files")
 
         if copy_other_files:
             logger.info("copying files from source directory")
@@ -279,9 +290,11 @@ class FileHandler(object):
 
                 for fname in copy_files:
                     if os.path.isdir(os.path.join(self.album.sourcedir, fname)):
-                        copytree_multi(os.path.join(self.album.sourcedir, fname), os.path.join(self.album.target_dir, fname))
+                        copytree_multi(os.path.join(self.album.sourcedir, fname), os.path.join(
+                            self.album.target_dir, fname))
                     else:
-                        shutil.copyfile(os.path.join(self.album.sourcedir, fname), os.path.join(self.album.target_dir, fname))
+                        shutil.copyfile(os.path.join(self.album.sourcedir, fname), os.path.join(
+                            self.album.target_dir, fname))
 
             for disc in self.album.discs:
                 copy_files = disc.copy_files
@@ -291,23 +304,37 @@ class FileHandler(object):
 
                 for fname in copy_files:
                     if not fname.endswith(".m3u"):
-                        if disc.sourcedir != None:
-                            source_path = os.path.join(self.album.sourcedir, disc.sourcedir)
-                        else:
-                            source_path = self.album.sourcedir
 
-                        if disc.target_dir != None:
-                            target_path = os.path.join(self.album.target_dir, disc.target_dir)
-                        else:
-                            target_path = self.album.target_dir
+                        source_path = self.album.sourcedir
+                        target_path = self.album.target_dir
+
+                        try:  # safe
+                            if hasattr(disc, 'sourcedir') and \
+                                    disc.sourcedir is not None:
+                                source_path = os.path.join(
+                                    self.album.sourcedir, disc.sourcedir)
+                        except Exception as e:
+                            pass
+
+                        try:  # safe
+                            if hasattr(disc, 'target_dir') and \
+                                    disc.target_dir is not None:
+                                target_path = os.path.join(
+                                    self.album.target_dir, disc.target_dir)
+                        except Exception as e:
+                            pass
 
                         if not os.path.exists(target_path):
                             self.mkdir_p(target_path)
 
                         if os.path.isdir(os.path.join(source_path, fname)):
-                            copytree_multi(os.path.join(source_path, fname), os.path.join(target_path, fname))
+                            copytree_multi(os.path.join(
+                                source_path, fname),
+                                os.path.join(target_path, fname))
                         else:
-                            shutil.copyfile(os.path.join(source_path, fname), os.path.join(target_path, fname))
+                            shutil.copyfile(os.path.join(
+                                source_path, fname),
+                                os.path.join(target_path, fname))
 
     def get_images(self, conn_mgr):
         """
@@ -325,8 +352,10 @@ class FileHandler(object):
             logger.debug("images: %s" % images)
 
             image_format = self.config.get("file-formatting", "image")
-            use_folder_jpg = self.config.getboolean("details", "use_folder_jpg")
-            download_only_cover = self.config.getboolean("details", "download_only_cover")
+            use_folder_jpg = self.config.getboolean(
+                "details", "use_folder_jpg")
+            download_only_cover = self.config.getboolean(
+                "details", "download_only_cover")
 
             logger.debug("image-format: %s" % image_format)
             logger.debug("use_folder_jpg: %s" % use_folder_jpg)
@@ -344,13 +373,15 @@ class FileHandler(object):
                         no = no + 1
                         picture_name = image_format + "-%.2d.jpg" % no
 
-                    conn_mgr.fetch_image(os.path.join(self.album.target_dir, picture_name), image_url)
+                    conn_mgr.fetch_image(os.path.join(
+                        self.album.target_dir, picture_name), image_url)
 
                     if i == 0 and download_only_cover:
                         break
 
                 except Exception as e:
-                    logger.error("Unable to download image '%s', skipping." % image_url)
+                    logger.error(
+                        "Unable to download image '%s', skipping." % image_url)
                     print(e)
 
     def embed_coverart_album(self):
@@ -414,9 +445,9 @@ class FileHandler(object):
 
         codecs = ['.flac', '.ogg', '.mp3', '.ape']
         lg_options = {
-                    '.flac': '-a -k -s e',
-                    '.mp3': '-I 4 -S -L -a -k -s e'
-                    }
+            '.flac': '-a -k -s e',
+            '.mp3': '-I 4 -S -L -a -k -s e'
+        }
         albumdir = self.album.target_dir
         # work out if this is a multidisc set.  Note that not all
         #  subdirectories have music files, e.g. scans, covers, etc.
@@ -438,18 +469,20 @@ class FileHandler(object):
                     matched.add(list(filter(f.endswith, codecs))[0])
 
         for match in list(matched):
-            pattern = os.path.join(albumdir, '**', '*' + match) if multidisc > 0 else os.path.join(albumdir, '*' + match)
+            pattern = os.path.join(
+                albumdir, '**', '*' + match) if multidisc > 0 else os.path.join(albumdir, '*' + match)
             return_code = None
 
             logger.debug('Adding replaygain to files: {}'.format(pattern))
 
             if self.rg_application == 'metaflac':
-                cmd = 'metaflac --add-replay-gain {}'.format( \
+                cmd = 'metaflac --add-replay-gain {}'.format(
                     self._escape_string(pattern))
                 return_code = os.system(cmd)
             elif self.rg_application == 'loudgain':
-                options = lg_options[match] if match in lg_options.keys() else ''
-                cmd = 'loudgain {} {}'.format( \
+                options = lg_options[match] if match in lg_options.keys(
+                ) else ''
+                cmd = 'loudgain {} {}'.format(
                     options, self._escape_string(pattern))
                 return_code = os.system(cmd)
             else:
@@ -505,11 +538,13 @@ class TaggerUtils(object):
         self.nfo_format = self.config.get("file-formatting", "nfo")
         self.disc_folder_name = self.config.get("file-formatting", "discs")
         self.normalize = self.config.get("file-formatting", "normalize")
-        self.use_lower = self.config.getboolean("details", "use_lower_filenames")
+        self.use_lower = self.config.getboolean(
+            "details", "use_lower_filenames")
         self.join_artists = self.config.get("details", "join_artists")
 
 #        self.first_image_name = "folder.jpg"
-        self.copy_other_files = self.config.getboolean("details", "copy_other_files")
+        self.copy_other_files = self.config.getboolean(
+            "details", "copy_other_files")
         self.char_exceptions = self.config.get_character_exceptions
 
         self.sourcedir = sourcedir
@@ -546,7 +581,8 @@ class TaggerUtils(object):
         for i, desc in enumerate(self.album.format_description):
             if desc.lower() in self.format_mapping.keys():
                 if self.format_mapping[desc.lower()] is not None:
-                    self.album.format_description[i] = self.format_mapping[desc.lower()]
+                    self.album.format_description[i] = self.format_mapping[desc.lower(
+                    )]
 
     def _value_from_tag_format(self, format, discno=1, trackno=1, filetype=".mp3"):
         """ Fill in the used variables using the track information
@@ -581,9 +617,9 @@ class TaggerUtils(object):
             '%bitrate%': self.album.disc(discno).track(trackno).bitrate,
             '%channels%': self.album.disc(discno).track(trackno).channels,
             '%codec%': self.album.disc(discno).track(trackno).codec,
-            '%filesize%':'',
-            '%filesize_natural%':'',
-            '%length_samples%':'',
+            '%filesize%': '',
+            '%filesize_natural%': '',
+            '%length_samples%': '',
             '%encoding%': self.album.disc(discno).track(trackno).encoding,
             '%samplerate%': self.album.disc(discno).track(trackno).samplerate,
             '%channels%': self.album.disc(discno).track(trackno).channels,
@@ -610,7 +646,8 @@ class TaggerUtils(object):
         }
 
         for hashtag in property_map.keys():
-            format = format.replace(hashtag, re.escape(str(property_map[hashtag])))
+            format = format.replace(
+                hashtag, re.escape(str(property_map[hashtag])))
 
         return format
 
@@ -646,17 +683,18 @@ class TaggerUtils(object):
             if not self.album.has_multi_disc:
                 disc.target_dir = None
             else:
-                target_dir = self._value_from_tag(self.disc_folder_name, disc.discnumber)
+                target_dir = self._value_from_tag(
+                    self.disc_folder_name, disc.discnumber)
                 disc.target_dir = target_dir
 
             for track in disc.tracks:
                 # special handling for Various Artists discs
                 if self.album.artist == "Various":
                     newfile = self._value_from_tag(self.va_song_format, disc.discnumber,
-                                               track.tracknumber, filetype)
+                                                   track.tracknumber, filetype)
                 else:
                     newfile = self._value_from_tag(self.song_format, disc.discnumber,
-                                               track.tracknumber, filetype)
+                                                   track.tracknumber, filetype)
 
                 track.new_file = self.get_clean_filename(newfile)
 
@@ -681,12 +719,17 @@ class TaggerUtils(object):
                 self.album.disc(dn).track(tn).bitdepth = metadata.bitdepth
                 chans = metadata.channels
                 ch_opts = {1: 'mono', 2: 'stereo'}
-                self.album.disc(dn).track(tn).channels = ch_opts[chans] if chans in ch_opts else '{}ch'.format(chans)
-                self.album.disc(dn).track(tn).length_seconds_fp = metadata.length
+                self.album.disc(dn).track(
+                    tn).channels = ch_opts[chans] if chans in ch_opts else '{}ch'.format(chans)
+                self.album.disc(dn).track(
+                    tn).length_seconds_fp = metadata.length
                 length_seconds_fp = metadata.length
-                self.album.disc(dn).track(tn).length_seconds = int(length_seconds_fp)
-                self.album.disc(dn).track(tn).length = str(timedelta(seconds = int(length_seconds_fp)))
-                length_ex_str = str(timedelta(seconds = round(length_seconds_fp, 4)))
+                self.album.disc(dn).track(
+                    tn).length_seconds = int(length_seconds_fp)
+                self.album.disc(dn).track(tn).length = str(
+                    timedelta(seconds=int(length_seconds_fp)))
+                length_ex_str = str(
+                    timedelta(seconds=round(length_seconds_fp, 4)))
                 self.album.disc(dn).track(tn).length_ex = length_ex_str[:-2]
 
     def _directory_has_audio_files(self, dir):
@@ -714,7 +757,7 @@ class TaggerUtils(object):
             if x.endswith(codecs):
                 return False
             elif os.path.isdir(os.path.join(sourcedir, x)) and \
-            self._directory_has_audio_files(os.path.join(sourcedir, x)):
+                    self._directory_has_audio_files(os.path.join(sourcedir, x)):
                 return True
         return False
 
@@ -750,7 +793,8 @@ class TaggerUtils(object):
                     logger.debug("is it a dir? %s" % y)
                     if os.path.isdir(os.path.join(sourcedir, y)):
                         if self._directory_has_audio_files(os.path.join(sourcedir, y)):
-                            logger.debug("Setting disc(%s) sourcedir to: %s" % (dirno, y))
+                            logger.debug(
+                                "Setting disc(%s) sourcedir to: %s" % (dirno, y))
                             self.album.discs[dirno].sourcedir = y
                             dirno = dirno + 1
                     else:
@@ -760,17 +804,15 @@ class TaggerUtils(object):
                 logger.debug("Setting disc sourcedir to none")
                 self.album.discs[0].sourcedir = None
 
+            total_tracks = sum(
+                1 for disc in self.album.discs for t in disc.tracks)
+            pos = 0
+
             for disc in self.album.discs:
-                # print('disc.sourcedir: {}'.format(disc.sourcedir))
-                # try:
-                #     disc_source_dir = os.path.join(self.album.sourcedir, disc.sourcedir) \
-                #         if disc.sourcedir is not None else None
-                # except AttributeError:
-                #     logger.error("there seems to be a problem in the meta-data, check if there are sub-tracks")
-                #     raise TaggerError("no disc sourcedir defined, does this release contain sub-tracks?")
 
                 if hasattr(disc, 'sourcedir') and disc.sourcedir is not None:
-                    disc_source_dir = os.path.join(self.album.sourcedir, disc.sourcedir)
+                    disc_source_dir = os.path.join(
+                        self.album.sourcedir, disc.sourcedir)
                 else:
                     disc_source_dir = self.album.sourcedir
 
@@ -785,40 +827,48 @@ class TaggerUtils(object):
                 disc_list.sort()
 
                 disc.copy_files = [x for x in disc_list
-                                if not x.lower().endswith(TaggerUtils.FILE_TYPE)]
+                                   if not x.lower().endswith(TaggerUtils.FILE_TYPE)]
 
                 target_list = [os.path.join(disc_source_dir, x) for x in disc_list
-                                 if x.lower().endswith(TaggerUtils.FILE_TYPE)]
+                               if x.lower().endswith(TaggerUtils.FILE_TYPE)]
 
                 # bug here for multi-disc
-                # targetlist holds all tracks combined across discs, but disc.tracks has the per disc count
-                # displays the mismatrch and proceeds to throw a  list index out of bounds
-                if not len(target_list) == len(disc.tracks):
+                # targetlist holds all tracks combined across discs, but
+                # disc.tracks is per disc collection, test them both -
+                # OVERKILL BUT SAFE
+                target_tracks = len(target_list)
+                disc_tracks = len(disc.tracks)
+                if not (target_tracks == disc_tracks or target_tracks == total_tracks):
                     logger.debug(f"target_list: {target_list}")
-                    logger.error(f"not matching number of files... want {len(target_list)} have {len(disc.tracks)}")
+                    logger.error(
+                        f"not matching number of files... want {target_tracks} have {disc_tracks}")
                     # we should throw an error in here
 
-                for position, filename in enumerate(target_list):
-                    logger.debug(f"track position: {position}")
+                # minimal rework for multi-disk -> tracks is the driver
+                for _, track in enumerate(disc.tracks):
 
-                    track = disc.tracks[position]
-
-                    logger.debug("mapping file %s --to--> %s - %s" % (filename,
-                                 track.artists[0], track.title))
+                    filename = target_list[pos]
+                    logger.debug(f"track position: {pos}")
+                    logger.debug(
+                        f"mapping file {filename} --to--> {track.artists[0]} - {track.title}")
 
                     track.orig_file = os.path.basename(filename)
-                    track.full_path = os.path.join(self.album.sourcedir, filename)
+                    track.full_path = os.path.join(
+                        self.album.sourcedir, filename)
                     filetype = os.path.splitext(filename)[1]
                     disc.filetype = filetype
+                    pos += 1
 
             self._set_target_discs_and_tracks(filetype)
 
         except (OSError) as e:
             if e.errno == errno.EEXIST:
                 logger.error("No such directory '{}'".format(self.sourcedir))
-                raise TaggerError("No such directory '{}'".format(self.sourcedir))
+                raise TaggerError(
+                    "No such directory '{}'".format(self.sourcedir))
             else:
-                raise TaggerError("General IO system error '{}'".format(errno[e]))
+                raise TaggerError(
+                    "General IO system error '{}'".format(errno[e]))
 
     @property
     def dest_dir_name(self):
@@ -859,7 +909,6 @@ class TaggerUtils(object):
         nfo = self._value_from_tag(self.nfo_format)
         return self.get_clean_filename(nfo)
 
-
     def get_clean_filename(self, f):
         """ Removes unwanted characters from file names """
 
@@ -871,8 +920,9 @@ class TaggerUtils(object):
             fileext = ""
 
         a = str(filename)
-        a = re.sub(r'\.$', '', a) # windows doesn't like folders ending with '.'
-        a = re.sub(r'\$', 'S', a) # Replace $ with S
+        # windows doesn't like folders ending with '.'
+        a = re.sub(r'\.$', '', a)
+        a = re.sub(r'\$', 'S', a)  # Replace $ with S
 
         for k, v in self.char_exceptions.items():
             a = a.replace(k, v)
@@ -880,9 +930,8 @@ class TaggerUtils(object):
         if self.normalize == True:
             a = normalize("NFKD", a)
 
-        cf = re.compile(r"[^-\w.,()\[\]\s#@&!']") # allowed characters
+        cf = re.compile(r"[^-\w.,()\[\]\s#@&!']")  # allowed characters
         cf = cf.sub("", str(a))
-
 
         # Don't force space/underscore replacement. If the user wants this it
         # can be done via config. The user may _want_ spaces.
@@ -900,7 +949,7 @@ class TaggerUtils(object):
     def create_file_from_template(self, template_name, file_name):
         file_template = self.template_lookup.get_template(template_name)
         return write_file(file_template.render(album=self.album),
-            os.path.join(self.album.target_dir, file_name))
+                          os.path.join(self.album.target_dir, file_name))
 
     def create_nfo(self, dest_dir):
         """ Writes the .nfo file to disk. """

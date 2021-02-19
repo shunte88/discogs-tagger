@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import pprint
 import os
 from pathlib import Path
 import shutil
@@ -9,8 +10,8 @@ from ext.cue import CUE, Track
 import logging
 logger = logging
 
-import pprint
 pp = pprint.PrettyPrinter(indent=4)
+
 
 class FileUtils(object):
     def __init__(self, tagger_config, options):
@@ -109,7 +110,8 @@ class FileUtils(object):
             cue = CUE(cue_in)
             if cue.title is not None:
                 cue.title = re.sub('(?i)\s+(cd|disc)\s*\d+$', '', cue.title)
-            cue.output_format = str(idx + 1) + '-%n' if len(files) > 1 else '%n'
+            cue.output_format = str(idx + 1) + \
+                '-%n' if len(files) > 1 else '%n'
             if len(files) > 1:
                 cue.discnumber = str(idx + 1)
                 cue.disctotal = str(len(files))
@@ -127,30 +129,31 @@ class FileUtils(object):
         if cue.disctotal is not None and int(cue.disctotal) > 1:
             file_path = os.path.join(file_path, 'cd' + str(cue.discnumber))
         for track in cue.tracks:
-            if not track.number==None:
-                src_file_name = cue.discnumber + '-' + str(track.number).zfill(2)+'.flac' if cue.discnumber is not None else str(track.number).zfill(2)+'.flac'
+            if not track.number == None:
+                src_file_name = cue.discnumber + '-' + str(track.number).zfill(
+                    2)+'.flac' if cue.discnumber is not None else str(track.number).zfill(2)+'.flac'
                 audio = FLAC(os.path.join(file_path, src_file_name))
-                if not track.title==None:
+                if not track.title == None:
                     audio["title"] = track.title
-                if cue.performer!=None:
+                if cue.performer != None:
                     audio["artist"] = cue.performer
-                if not track.number==None:
+                if not track.number == None:
                     audio["tracknumber"] = str(track.number)
-                if not cue.title==None:
+                if not cue.title == None:
                     audio["album"] = cue.title
-                if not track.isrc==None:
+                if not track.isrc == None:
                     audio["isrc"] = track.isrc
-                if not cue.genre==None:
+                if not cue.genre == None:
                     audio["genre"] = cue.genre
-                if not cue.date==None:
+                if not cue.date == None:
                     audio["date"] = cue.date
-                if not cue.discid==None:
+                if not cue.discid == None:
                     audio["discid"] = cue.discid
-                if not cue.comment==None:
+                if not cue.comment == None:
                     audio["comment"] = cue.comment
-                if not cue.discnumber==None:
+                if not cue.discnumber == None:
                     audio["discnumber"] = cue.discnumber
-                if not cue.disctotal==None:
+                if not cue.disctotal == None:
                     audio["disctotal"] = cue.disctotal
                 # 0th track left blank
                 audio["tracktotal"] = str(len(cue.tracks) - 1)
@@ -163,16 +166,17 @@ class FileUtils(object):
         """
         destination = cue.image_file_directory
         if cue.disctotal is not None and int(cue.disctotal) > 1:
-            destination = os.path.join(cue.image_file_directory, 'cd' + str(cue.discnumber))
+            destination = os.path.join(
+                cue.image_file_directory, 'cd' + str(cue.discnumber))
         p = Path(destination)
         if not p.exists():
             p.mkdir()
 
         logger.debug('splitting cue files')
-        cmd = "shntool split -f {0} {1} -t {2} -o flac -d {3}".format( \
-            self._escape_string(cue.file_name), \
-            self._escape_string(cue.image_file_name), \
-            cue.output_format, \
+        cmd = "shntool split -f {0} {1} -t {2} -o flac -d {3}".format(
+            self._escape_string(cue.file_name),
+            self._escape_string(cue.image_file_name),
+            cue.output_format,
             self._escape_string(destination))
 
         return_code = os.system(cmd)
@@ -191,7 +195,8 @@ class FileUtils(object):
         """
         if return_code == 0:
             logger.debug('cleaning up cue files, and associated audio files')
-            done_dir = os.path.join(cue.image_file_directory, self.cue_done_dir)
+            done_dir = os.path.join(
+                cue.image_file_directory, self.cue_done_dir)
             p = Path(done_dir)
             if not p.exists():
                 p.mkdir()

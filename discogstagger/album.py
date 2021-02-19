@@ -2,9 +2,11 @@ import logging
 
 logger = logging
 
+
 class BaseObject(object):
 
     pass
+
 
 class Track(BaseObject):
     """ A disc contains several tracks, each track has a tracknumber,
@@ -16,6 +18,7 @@ class Track(BaseObject):
         self.artists = artists
         self.discsubtitle = None
         self.mediatype = None
+        self.filename = None
 
     @property
     def artist(self):
@@ -23,6 +26,7 @@ class Track(BaseObject):
 
     def __getattr__(self, name):
         return None
+
 
 class Disc(BaseObject):
     """ An album has one or more discs, each disc has a number and
@@ -38,6 +42,7 @@ class Disc(BaseObject):
 
     def track(self, trackno):
         return self.tracks[trackno - 1]
+
 
 class Album(BaseObject):
     """ An album contains one or more discs and has a title, an artist

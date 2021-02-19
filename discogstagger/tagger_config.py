@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 import errno
 import logging
@@ -12,7 +14,8 @@ except:
 from configparser import RawConfigParser
 
 logger = logging
-#.getLogger(__name__)
+# .getLogger(__name__)
+
 
 class memoized_property(object):
 
@@ -26,6 +29,7 @@ class memoized_property(object):
             return self
         obj.__dict__[self.__name__] = result = self.fget(obj)
         return result
+
 
 class TaggerConfig(RawConfigParser):
     """ provides the configuration mechanisms for the discogstagger """
@@ -64,8 +68,8 @@ class TaggerConfig(RawConfigParser):
     def get_character_exceptions(self):
         """ placeholders for special characters within character exceptions. """
 
-
-        exceptions = self._sections["character_exceptions"] if "character_exceptions" in self._sections else {}
+        exceptions = self._sections["character_exceptions"] if "character_exceptions" in self._sections else {
+        }
 
         KEYS = {
             "{space}": " ",
