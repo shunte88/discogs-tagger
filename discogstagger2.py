@@ -118,11 +118,11 @@ def processSourceDirs(source_dirs, tagger_config):
 
             if os.path.exists(done_file_path) and not options.forceUpdate:
                 logger.warn(
-                    f'Do not read {source_dir}, because {done_file} exists and forceUpdate is false')
+                    f'Not reading {source_dir}, as {done_file} exists and forceUpdate is false')
                 continue
 
-            # reread config to make sure, that the album specific options are reset for each
-            # album
+            # reread config to make sure, that the album
+            # specific options are reset for each album
             tagger_config = TaggerConfig(options.conffile)
 
             if options.releaseid is not None:
@@ -141,14 +141,11 @@ def processSourceDirs(source_dirs, tagger_config):
                     connector = discogs_connector
 
             if not releaseid:
-                logger.warn('No releaseid for {}'.format(source_dir))
+                logger.warn(f'No releaseid for {source_dir}')
                 continue
 
-            # if not releaseid:
-            #     p.error("Please specify the discogs.com releaseid ('-r')")
-
-            logger.info('Found release ID: {} for source dir: {}'.format(
-                releaseid, source_dir))
+            logger.info(
+                'Found release ID: {releaseid} for source dir: {source_dir}')
 
             # read destination directory
             # !TODO if both are the same, we are not copying anything,
@@ -157,9 +154,9 @@ def processSourceDirs(source_dirs, tagger_config):
                 destdir = source_dir
             else:
                 destdir = options.destdir
-                logger.debug('destdir set to {}'.format(options.destdir))
+                logger.debug(f'destdir set to {options.destdir}')
 
-            logger.info('Using destination directory: {}'.format(destdir))
+            logger.info(f'Using destination directory: {destdir}')
             logger.debug("starting tagging...")
 
             if releaseid is not None and release is None:
@@ -182,7 +179,7 @@ def processSourceDirs(source_dirs, tagger_config):
                 discs_with_errors.append(msg)
                 continue
 
-            logger.info(f'Tagging album "{album.artist} - {album.title}')
+            logger.info(f'Tagging album "{album.artist} - {album.title}"')
 
             tagHandler = TagHandler(album, tagger_config)
 

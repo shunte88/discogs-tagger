@@ -57,6 +57,8 @@ class TagHandler(object):
         self.keep_tags = self.config.get("details", "keep_tags")
         self.user_agent = self.config.get("common", "user_agent")
         self.variousartists = self.config.get("details", "variousartists")
+        self.releasecountry_formatted = self.config.get(
+            "details", "releasecountry_formatted")
 
     def tag_album(self):
         """ tags all tracks in an album, the filenames are determined using
@@ -93,6 +95,11 @@ class TagHandler(object):
 
         # set album metadata
         metadata.album = self.album.title  # add formatting methods
+
+        if self.releasecountry_formatted:
+            metadata.album += f" [{self.album.countryiso}]"
+            metadata.album += f" [{self.album.catnumbers[0]}]"
+
         if "various" not in self.album.artist.lower():
             metadata.composer = self.album.artist
 
