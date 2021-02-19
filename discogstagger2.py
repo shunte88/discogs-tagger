@@ -145,7 +145,7 @@ def processSourceDirs(source_dirs, tagger_config):
                 continue
 
             logger.info(
-                'Found release ID: {releaseid} for source dir: {source_dir}')
+                f'Found release ID: {releaseid} for source dir: {source_dir}')
 
             # read destination directory
             # !TODO if both are the same, we are not copying anything,
