@@ -65,11 +65,6 @@ class TagHandler(object):
             the given properties on the tracks
         """
         for disc in self.album.discs:
-            # if disc.target_dir != None:
-            #     target_folder = os.path.join(self.album.target_dir, disc.target_dir)
-            # else:
-            #     target_folder = self.album.target_dir
-            #
             for track in disc.tracks:
                 path, file = os.path.split(track.full_path)
                 self.tag_single_track(path, track)
@@ -99,6 +94,7 @@ class TagHandler(object):
         if self.releasecountry_formatted:
             metadata.album += f" [{self.album.countryiso}]"
             metadata.album += f" [{self.album.catnumbers[0]}]"
+            metadata.album.replace(', none]',']',1).replace('[none]','[]',2)
 
         if "various" not in self.album.artist.lower():
             metadata.composer = self.album.artist
@@ -237,6 +233,9 @@ class FileHandler(object):
                     self.album.target_dir, disc.target_dir)
             else:
                 target_folder = self.album.target_dir
+            target_folder = target_folder.replace(', none]',']',1).replace('[none]','[]',2)
+
+            logger.info(f"album folder ....: {self.album.target_dir}")
 
             copy_needed = False
             if not source_folder == target_folder:
@@ -247,6 +246,8 @@ class FileHandler(object):
             for track in disc.tracks:
                 logger.debug("source_folder: %s" % source_folder)
                 logger.debug("target_folder: %s" % target_folder)
+                track.new_file = track.new_file.replace(', none]',']',1).replace('[none]','[]',2)
+
                 logger.debug("orig_file: %s" % track.orig_file)
                 logger.debug("new_file: %s" % track.new_file)
 
@@ -529,6 +530,9 @@ class TaggerUtils(object):
     # supported file types.
     FILE_TYPE = (".mp3", ".flac",)
 
+    def fixNone(self, value):
+        return value.replace(', none]',']',1).replace('none]',']',2)
+
     def __init__(self, sourcedir, destdir, tagger_config, album=None):
         self.config = tagger_config
 
@@ -549,13 +553,12 @@ class TaggerUtils(object):
             "details", "use_lower_filenames")
         self.join_artists = self.config.get("details", "join_artists")
 
-#        self.first_image_name = "folder.jpg"
         self.copy_other_files = self.config.getboolean(
             "details", "copy_other_files")
         self.char_exceptions = self.config.get_character_exceptions
 
         self.sourcedir = sourcedir
-        self.destdir = destdir
+        self.destdir = self.fixNone(destdir)
 
         if not album == None:
             self.album = album
@@ -567,12 +570,14 @@ class TaggerUtils(object):
         self.album.sourcedir = sourcedir
         # the album is stored in a directory beneath the destination directory
         # and following the given dir_format
+
         self.album.target_dir = self.dest_dir_name
 
-        logging.debug("album.target_dir: %s" % self.dest_dir_name)
+        logging.debug(f"album.target_dir: {self.dest_dir_name}")
 
         # add template functionality ;-)
         self.template_lookup = TemplateLookup(directories=["templates"])
+
 
     def map_format_description(self):
         """ Gets format desription, and maps to user defined variations,
@@ -898,7 +903,7 @@ class TaggerUtils(object):
 
             logger.debug("d_dir: {}".format(dest_dir))
 
-        dir_name = os.path.join(path_name, dest_dir)
+        dir_name = self.fixNone(os.path.join(path_name, dest_dir))
 
         return dir_name
 
