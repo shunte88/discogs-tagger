@@ -313,17 +313,20 @@ class DiscogsAlbum(object):
         iso = None
         if 2 == len(country):
             iso = country
-        elif country in ('Europe', 'europe'):
+        elif country in ('Europe', 'europe', 'UK, Europe & US'):
             iso = 'EU'
         else:
-            _temp = pycountry.countries.search_fuzzy(country)[0]
+            if ' ' in country[0]:  # multi-word go fuzzy
+                _temp = pycountry.countries.search_fuzzy(country.trim())[0]
+            else:
+                _temp = pycountry.countries.get(name=country)
             if _temp:
                 with ignored(KeyError, IndexError):  # , ObjectError):
                     iso = _temp.alpha_2
                 if not iso:
                     iso = country
-                else:
-                    iso = country
+            else:
+                iso = country
         return iso
 
     def map(self):
@@ -359,8 +362,10 @@ class DiscogsAlbum(object):
         if "country" in self.release.data:
             album.country = self.release.data["country"]
             album.countryiso = self.getcountryiso(album.country)
+            logging.info(  # debug!!!
+                f"Country is '{album.country}', with ISO of '{album.countryiso}'")
         else:
-            logging.warn("no country set for relid %s" % self.release.id)
+            logging.warn(f"no country set for relid {self.release.id}")
             album.country = ""
             album.countryiso = ' '
 
@@ -375,6 +380,12 @@ class DiscogsAlbum(object):
         album.discs = self.discs_and_tracks(album)
 
         return album
+
+    def addCollection(self):
+        logger.debug("add to collection as required")
+        _usr = self.discogs_client.User()
+        if not _usr.collection.get(self.release.id):
+            _usr.collection.add(self.release.id)
 
     @property
     def media(self):
@@ -415,15 +426,15 @@ class DiscogsAlbum(object):
     def url(self):
         """ returns the discogs url of this release """
 
-        return "http://www.discogs.com/release/{}".format(self.release.id)
+        return f"http://www.discogs.com/release/{self.release.id}"
 
-    @property
+    @ property
     def labels_and_numbers(self):
         """ Returns all available catalog numbers"""
         for label in self.release.data["labels"]:
             yield self.clean_duplicate_handling(label["name"]), label["catno"]
 
-    @property
+    @ property
     def images(self):
         """ return a single list of images for the given album """
 
@@ -432,14 +443,14 @@ class DiscogsAlbum(object):
         except KeyError:
             pass
 
-    @property
+    @ property
     def country(self):
         try:
             return self.release.data["country"]
         except KeyError:
             return None
 
-    @property
+    @ property
     def countryiso(self):
         iso = None
         try:
@@ -453,7 +464,7 @@ class DiscogsAlbum(object):
         else:
             return '  '
 
-    @property
+    @ property
     def year(self):
         """ returns the album release year obtained from API 2.0 """
 
@@ -465,7 +476,7 @@ class DiscogsAlbum(object):
         except AttributeError:
             return "1900"
 
-    @property
+    @ property
     def disctotal(self):
         """ Obtain the number of discs for the given release. """
 
@@ -488,7 +499,7 @@ class DiscogsAlbum(object):
         logger.info(f"determined {discno} disc{anglodiscno} total")
         return discno
 
-    @property
+    @ property
     def master_id(self):
         """ returns the master release id """
 
