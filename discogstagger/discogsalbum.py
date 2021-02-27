@@ -258,7 +258,7 @@ class LocalDiscogsConnector(object):
 
         self.content = self.convert(json.loads(dummy_response.content))
 
-        logger.debug('content: %s' % self.content)
+        logger.debug('*** content: %s (%d)' % self.content, len(self.content))
 
         release = discogs.Release(client, self.content)
 
@@ -313,8 +313,10 @@ class DiscogsAlbum(object):
         iso = None
         if 2 == len(country):
             iso = country
-        elif country in ('Europe', 'europe', 'UK, Europe & US'):
+        elif country in ('UK & Europe', 'Europe', 'europe', 'UK, Europe & US', 'USA and Europe', 'USA & Europe'):
             iso = 'EU'
+        elif 'Russia' == country:
+            iso = 'RU'
         else:
             if ' ' in country[0]:  # multi-word go fuzzy
                 _temp = pycountry.countries.search_fuzzy(country.trim())[0]
@@ -362,10 +364,10 @@ class DiscogsAlbum(object):
         if "country" in self.release.data:
             album.country = self.release.data["country"]
             album.countryiso = self.getcountryiso(album.country)
-            logging.info(  # debug!!!
+            logger.info(  # debug!!!
                 f"Country is '{album.country}', with ISO of '{album.countryiso}'")
         else:
-            logging.warn(f"no country set for relid {self.release.id}")
+            logger.warn(f"no country set for relid {self.release.id}")
             album.country = ""
             album.countryiso = ' '
 
@@ -598,6 +600,7 @@ class DiscogsAlbum(object):
                 # USB-Stick-1-12
                 "^(?P<discnumber>USB-Stick)-(?P<tracknumber>\d+)$",
                 # "^(?P<discnumber>\d+).(?P<tracknumber>\d+)$",   # 1.05 (this is not multi-disc but multi-tracks for one track)....
+                # !TODO support indexed tracks
             )
 
             for scheme in NUMBERING_SCHEMES:
@@ -610,7 +613,7 @@ class DiscogsAlbum(object):
             return {'tracknumber': position,
                     'discnumber': 1}
 
-        logging.error("Unable to match multi-disc track/position")
+        logger.error("Unable to match multi-disc track/position")
         return False
 
     @property
@@ -636,38 +639,39 @@ class DiscogsAlbum(object):
         disc = Disc(1)
         running_num = 0
 
-        for i, t in enumerate(x for x in self.release.tracklist):
+        for tp, trak in enumerate(x for x in self.release.tracklist):
 
-            if t.position is None:
-                logging.error("position is null, shouldn't be...")
+            if trak.position is None:
+                logger.error("position is null, shouldn't be...")
 
-            exclude = ("Video", "video", "DVD")
-            if t.position.startswith(exclude) or t.position.endswith(exclude):
+            exclude = ("Video", "video", "DVD", "BD", "Blu-Ray")
+            if trak.position.startswith(exclude) or trak.position.endswith(exclude):
                 continue
 
             # on multiple discs there do appears a subtitle as the first "track"
             # on the cd in discogs, this seems to be wrong, but we would like to
             # handle it anyway.
             # Headings could also be a chapter title.
-            if (t.title and not t.position and not t.duration) or \
-                (hasattr(t, 'type_') and t.type_ == 'heading') or \
-                    ('type_' in t.data and t.data['type_'] == 'heading'):
-                discsubtitle.append(t.title.strip())
+            if (trak.title and not trak.position and not trak.duration) or \
+                (hasattr(trak, 'type_') and trak.type_ == 'heading') or \
+                    ('type_' in trak.data and trak.data['type_'] == 'heading'):
+                discsubtitle.append(trak.title.strip())
                 continue
 
             running_num = running_num + 1
-            if t.artists:
-                artists = self.artists(t.artists)
-                sort_artist = self.sort_artist(t.artists)
+            if trak.artists:
+                artists = self.artists(trak.artists)
+                sort_artist = self.sort_artist(trak.artists)
             else:
                 artists = album.artists
                 sort_artist = album.sort_artist
 
-            track = Track(i + 1, t.title.strip(), artists)
+            track = Track(tp + 1, trak.title.strip(), artists)
 
-            if 'sub_tracks' in t.data:
+            # this valid but not included in the track count test!!!
+            if 'sub_tracks' in trak.data:
                 comments = []
-                for subtrack in t.data['sub_tracks']:
+                for subtrack in trak.data['sub_tracks']:
                     if subtrack['type_'] == 'track':
                         comment = subtrack['position'].strip(
                         ) + '. ' + subtrack['title'].strip()
@@ -677,19 +681,23 @@ class DiscogsAlbum(object):
                         comments.append(comment)
                 setattr(track, 'notes', '\r\n'.join(comments))
 
-            track.position = i
+            track.position = tp
+            pos = self.disc_and_track_no(trak.position)
 
-            pos = self.disc_and_track_no(t.position)
-            # box sets can have a mixture of CDs and other media, e.g. USB-Stick
-            # with, or without numbering.  Where numerical disc number follows the
-            # disc number, but we may have to add ourselves.  Store the media type
-            # so that we can use that later.
+            logger.info(
+                f'[{tp}] {pos["discnumber"]}-{pos["tracknumber"]} - {trak.title}')
+
+            # box sets can have a mixture of CDs and other media,
+            # e.g. USB-Stick with, or without numbering.  Where numerical
+            # disc number follows the disc number, but we may have to add
+            # ourselves.  Store the media type so that we can use that later.
             try:
                 # track.discnumber = int(pos["discnumber"])
                 if re.match('^\d+$', str(pos["discnumber"])):
                     track.discnumber = int(pos["discnumber"])
                 elif disc.mediatype != pos["discnumber"]:
-                    # if this is the first thing encountered don't increase disc count
+                    # if this is the first thing encountered
+                    # don't increase disc count
                     track.discnumber = disccount if len(
                         disc_list) == 0 else disccount + 1
                     track.mediatype = pos["discnumber"]
@@ -697,11 +705,11 @@ class DiscogsAlbum(object):
                     track.discnumber = disccount
                     track.mediatype = disc.mediatype
             except ValueError as ve:
-                msg = "cannot convert {0} to a valid track-/discnumber".format(
-                    t.position)
+                msg = f"cannot convert {trak.position} to a valid disc-track"
                 logger.error(msg)
                 raise AlbumError(msg)
 
+            # source of fragmentation here
             if track.discnumber != disc.discnumber:
                 disc_list.append(disc)
                 disc = Disc(track.discnumber)
@@ -993,8 +1001,8 @@ class DiscogsSearch(DiscogsConnector):
             if releases is None:
                 continue
 
-            for i, release in enumerate(releases):
-                if len(candidates) > 0 or i > 25:  # give up after 25 iterations
+            for ri, release in enumerate(releases):
+                if len(candidates) > 0 or ri > 25:  # give up after 25 iterations
                     return
                 self._rateLimit()
                 r = release.title.lower()
@@ -1220,19 +1228,19 @@ class DiscogsSearch(DiscogsConnector):
 
         # try averaging the tracklength variation out by the number of tracks
         tracktotal = len(current)
-        for i, track in enumerate(current):
+        for ti, track in enumerate(current):
             """ some tracks have alphanumerical identifiers,
                 e.g. vinyl, cassettes
             """
             difference = self._compareTimeDifference(
-                track['duration'], imported[i]['duration'])
+                track['duration'], imported[ti]['duration'])
             if difference.total_seconds() > tolerance:
                 tolerance = tolerance + difference.total_seconds()
 
         logger.info(
             f'tracklength tolerance before averaging out by the number of tracks:  {tolerance}')
         tolerance = tolerance / tracktotal
-        logging.debug(
+        logger.debug(
             'tracklength tolerance for release (change if there are any matching issues):  {}'.format(tolerance))
         logger.info(
             'tracklength tolerance for release (change if there are any matching issues):  {}'.format(tolerance))

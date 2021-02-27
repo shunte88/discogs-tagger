@@ -64,7 +64,10 @@ class TagHandler(object):
         """ tags all tracks in an album, the filenames are determined using
             the given properties on the tracks
         """
+
+        logger.debug(f'tag_album discs :: {len(self.album.discs)}')
         for disc in self.album.discs:
+            logger.debug(f'tag_album tracks :: {len(disc.tracks)}')
             for track in disc.tracks:
                 path, file = os.path.split(track.full_path)
                 self.tag_single_track(path, track)
@@ -94,7 +97,8 @@ class TagHandler(object):
         if self.releasecountry_formatted:
             metadata.album += f" [{self.album.countryiso}]"
             metadata.album += f" [{self.album.catnumbers[0]}]"
-            metadata.album.replace(', none]',']',1).replace('[none]','[]',2)
+            metadata.album.replace(
+                ', none]', ']', 1).replace('[none]', '[]', 2)
 
         if "various" not in self.album.artist.lower():
             metadata.composer = self.album.artist
@@ -133,6 +137,7 @@ class TagHandler(object):
         metadata.disctitle = track.discsubtitle
         metadata.disc = track.discnumber
         metadata.disctotal = len(self.album.discs)
+        logger.debug(f"metadata.disctotal is {metadata.disctotal}")
         metadata.media = self.album.media
 
         if self.album.is_compilation:
@@ -233,7 +238,8 @@ class FileHandler(object):
                     self.album.target_dir, disc.target_dir)
             else:
                 target_folder = self.album.target_dir
-            target_folder = target_folder.replace(', none]',']',1).replace('[none]','[]',2)
+            target_folder = target_folder.replace(
+                ', none]', ']', 1).replace('[none]', '[]', 2)
 
             logger.info(f"album folder ....: {self.album.target_dir}")
 
@@ -246,7 +252,8 @@ class FileHandler(object):
             for track in disc.tracks:
                 logger.debug("source_folder: %s" % source_folder)
                 logger.debug("target_folder: %s" % target_folder)
-                track.new_file = track.new_file.replace(', none]',']',1).replace('[none]','[]',2)
+                track.new_file = track.new_file.replace(
+                    ', none]', ']', 1).replace('[none]', '[]', 2)
 
                 logger.debug("orig_file: %s" % track.orig_file)
                 logger.debug("new_file: %s" % track.new_file)
@@ -531,7 +538,7 @@ class TaggerUtils(object):
     FILE_TYPE = (".mp3", ".flac",)
 
     def fixNone(self, value):
-        return value.replace(', none]',']',1).replace('none]',']',2)
+        return value.replace(', none]', ']', 1).replace('none]', ']', 2)
 
     def __init__(self, sourcedir, destdir, tagger_config, album=None):
         self.config = tagger_config
@@ -552,6 +559,8 @@ class TaggerUtils(object):
         self.use_lower = self.config.getboolean(
             "details", "use_lower_filenames")
         self.join_artists = self.config.get("details", "join_artists")
+        self.join_artists_filenames = self.config.get(
+            "details", "join_artists_filenames")
 
         self.copy_other_files = self.config.getboolean(
             "details", "copy_other_files")
@@ -577,7 +586,6 @@ class TaggerUtils(object):
 
         # add template functionality ;-)
         self.template_lookup = TemplateLookup(directories=["templates"])
-
 
     def map_format_description(self):
         """ Gets format desription, and maps to user defined variations,
@@ -606,8 +614,8 @@ class TaggerUtils(object):
 
         property_map = {
 
-            '%album artist%': self.join_artists.join(self.album.artists),
-            '%albumartist%': self.join_artists.join(self.album.artists),
+            '%album artist%': self.join_artists_filenames.join(self.album.artists),
+            '%albumartist%': self.join_artists_filenames.join(self.album.artists),
             '%album%': self.album.title,
             '%catno%': ', '.join(self.album.catnumbers),
             '%country%': self.album.country,
@@ -679,7 +687,7 @@ class TaggerUtils(object):
         format = stringFormatting.parseString(format)
         format = self.get_clean_filename(format)
 
-        logger.debug("output: %s" % format)
+        logger.debug(f"output: {format}")
 
         return format
 
@@ -691,7 +699,8 @@ class TaggerUtils(object):
             these can be calculated without knowing the source (well, the
             filetype seems to be a different calibre)
         """
-        for disc in self.album.discs:
+
+        for dn, disc in enumerate(self.album.discs):
             if not self.album.has_multi_disc:
                 disc.target_dir = None
             else:
@@ -699,7 +708,8 @@ class TaggerUtils(object):
                     self.disc_folder_name, disc.discnumber)
                 disc.target_dir = target_dir
 
-            for track in disc.tracks:
+            for tn, track in enumerate(disc.tracks):
+
                 # special handling for Various Artists discs
                 if self.album.artist == "Various":
                     newfile = self._value_from_tag(self.va_song_format, disc.discnumber,
@@ -798,8 +808,6 @@ class TaggerUtils(object):
             logger.debug(f"flagged mult-disc: {self.album.has_multi_disc}")
             if self.album.has_multi_disc or self._audio_files_in_subdirs(dir_list) is True:
                 logger.debug(">>> is multi disc album, looping discs")
-
-                logger.debug("dir_list: %s" % dir_list)
                 dirno = 0
                 for y in dir_list:
                     logger.debug("is it a dir? %s" % y)
@@ -820,7 +828,7 @@ class TaggerUtils(object):
                 1 for disc in self.album.discs for t in disc.tracks)
             pos = 0
 
-            for disc in self.album.discs:
+            for dn, disc in enumerate(self.album.discs):
 
                 if hasattr(disc, 'sourcedir') and disc.sourcedir is not None:
                     disc_source_dir = os.path.join(
@@ -828,11 +836,9 @@ class TaggerUtils(object):
                 else:
                     disc_source_dir = self.album.sourcedir
 
-                # if disc_source_dir == None:
-                #     disc_source_dir = self.album.sourcedir
-
-                logger.debug("discno: %d" % disc.discnumber)
-                logger.debug("sourcedir: %s" % disc_source_dir)
+                logger.debug("discn inst ..: %d" % dn)
+                logger.debug("discno ......: %d" % disc.discnumber)
+                logger.debug("sourcedir ...: %s" % disc_source_dir)
 
                 # strip unwanted files
                 disc_list = os.listdir(disc_source_dir)
@@ -882,7 +888,7 @@ class TaggerUtils(object):
                 raise TaggerError(
                     "General IO system error '{}'".format(errno[e]))
 
-    @property
+    @ property
     def dest_dir_name(self):
         """ generates new album directory name """
 
@@ -907,14 +913,14 @@ class TaggerUtils(object):
 
         return dir_name
 
-    @property
+    @ property
     def m3u_filename(self):
         """ generates the m3u file name """
 
         m3u = self._value_from_tag(self.m3u_format)
         return self.get_clean_filename(m3u)
 
-    @property
+    @ property
     def nfo_filename(self):
         """ generates the nfo file name """
 
@@ -926,7 +932,7 @@ class TaggerUtils(object):
 
         filename, fileext = os.path.splitext(f)
 
-        if not fileext in TaggerUtils.FILE_TYPE and not fileext in [".m3u", ".nfo"]:
+        if fileext not in TaggerUtils.FILE_TYPE and fileext not in [".m3u", ".nfo"]:
             logger.debug("fileext: {}".format(fileext))
             filename = f
             fileext = ""
@@ -944,12 +950,6 @@ class TaggerUtils(object):
 
         cf = re.compile(r"[^-\w.,()\[\]\s#@&!']")  # allowed characters
         cf = cf.sub("", str(a))
-
-        # Don't force space/underscore replacement. If the user wants this it
-        # can be done via config. The user may _want_ spaces.
-        # cf = cf.replace(" ", "_")
-        # cf = cf.replace("__", "_")
-        # cf = cf.replace("_-_", "-")
 
         cf = "".join([cf, fileext])
 
@@ -972,10 +972,10 @@ class TaggerUtils(object):
             Adhering to the following m3u format.
 
             ---
-            #EXTM3U
-            #EXTINF:233,Artist - Song
+            # EXTM3U
+            # EXTINF:233,Artist - Song
             directory\file_name.mp3.mp3
-            #EXTINF:-1,My Cool Stream
+            # EXTINF:-1,My Cool Stream
             http://www.site.com:8000/listen.pls
             ---
 
